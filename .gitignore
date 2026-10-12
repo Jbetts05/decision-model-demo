@@ -1,0 +1,9 @@
+.azure/
+.venv/
+node_modules/
+local.settings.json
+.env
+*.log
+*.zip
+test-results/
+infra/main.json

@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The AI Switchboard</title>
+  <script>
+    (() => {
+      const param = new URLSearchParams(window.location.search).get("scoutTheme");
+      const theme =
+        param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --cp-bg: #f7f4ef;
+      --cp-bg-elevated: #fcfbf8;
+      --cp-surface: #ffffff;
+      --cp-surface-soft: #f5f5f5;
+      --cp-border: #dedede;
+      --cp-border-strong: #919191;
+      --cp-text: #242424;
+      --cp-text-muted: #5c5c5c;
+      --cp-text-soft: #6f6f6f;
+      --cp-accent: #b11f4b;
+      --cp-accent-hover: #9a1a41;
+      --cp-accent-soft: rgba(177, 31, 75, 0.08);
+      --cp-accent-fg: #ffffff;
+      --cp-success: #16a34a;
+      --cp-danger: #dc2626;
+      --cp-warning: #f59e0b;
+      --cp-link: #0078d4;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+      --cp-overlay: rgba(255, 255, 255, 0.8);
+      --cp-panel: rgba(255, 255, 255, 0.86);
+      --cp-panel-strong: rgba(255, 255, 255, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.55);
+      --cp-highlight: rgba(177, 31, 75, 0.12);
+    }
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --cp-bg: #3d3b3a;
+      --cp-bg-elevated: #343231;
+      --cp-surface: #292929;
+      --cp-surface-soft: #2e2e2e;
+      --cp-border: #474747;
+      --cp-border-strong: #5f5f5f;
+      --cp-text: #dedede;
+      --cp-text-muted: #919191;
+      --cp-text-soft: #b0b0b0;
+      --cp-accent: #fd8ea1;
+      --cp-accent-hover: #fb7b91;
+      --cp-accent-soft: rgba(253, 142, 161, 0.14);
+      --cp-accent-fg: #1a1a1a;
+      --cp-success: #4ade80;
+      --cp-danger: #f87171;
+      --cp-warning: #fbbf24;
+      --cp-link: #4da6ff;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+      --cp-overlay: rgba(41, 41, 41, 0.88);
+      --cp-panel: rgba(41, 41, 41, 0.72);
+      --cp-panel-strong: rgba(41, 41, 41, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.04);
+      --cp-highlight: rgba(253, 142, 161, 0.12);
+    }
+    :root {
+      --cp-card-shadow: 0 0 2px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.14);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--cp-bg);
+      color: var(--cp-text);
+      font-family: "Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.5;
+    }
+    main { max-width: 1440px; margin: 0 auto; padding: 32px 24px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+    h1 { font-size: clamp(1.5rem, 4vw, 2rem); line-height: 1.2; margin: 0; font-weight: 650; }
+    a { color: var(--cp-link); text-underline-offset: 3px; }
+    button, textarea { font: inherit; }
+    button {
+      cursor: pointer;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      padding: 8px 12px;
+      background: var(--cp-surface);
+      color: var(--cp-text);
+      min-height: 40px;
+    }
+    button:hover { border-color: var(--cp-border-strong); background: var(--cp-surface-soft); }
+    button:disabled { cursor: not-allowed; opacity: 0.55; }
+    :focus-visible { outline: 3px solid var(--cp-accent); outline-offset: 3px; }
+    .auth { font-size: 0.875rem; text-align: right; }
+    .muted { color: var(--cp-text-muted); }
+    .examples { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .examples button { font-size: 0.875rem; }
+    .examples button[aria-pressed="true"] {
+      border-color: var(--cp-accent);
+      background: var(--cp-accent-soft);
+      color: var(--cp-text);
+    }
+    .input-label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    .input-label label { font-weight: 600; }
+    .input-label span { font-size: 0.875rem; }
+    textarea {
+      display: block;
+      width: 100%;
+      min-height: 180px;
+      resize: vertical;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      padding: 12px;
+      background: var(--cp-surface);
+      color: var(--cp-text);
+    }
+    .actions { display: flex; align-items: center; gap: 16px; margin: 12px 0 24px; }
+    #run {
+      padding: 8px 28px;
+      background: var(--cp-accent);
+      border-color: var(--cp-accent);
+      color: var(--cp-accent-fg);
+      font-weight: 600;
+    }
+    #run:hover:not(:disabled) { background: var(--cp-accent-hover); border-color: var(--cp-accent-hover); }
+    #status, #catalog-status { font-size: 0.875rem; margin: 0; }
+    #catalog-status:not(:empty) { margin-bottom: 12px; }
+    .error { color: var(--cp-danger); }
+    .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+    .card {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 320px;
+      padding: 20px;
+      border: 1px solid var(--cp-border);
+      border-radius: 16px;
+      background: var(--cp-surface);
+      box-shadow: var(--cp-card-shadow);
+    }
+    .card h2 { font-size: 1.125rem; margin: 0; line-height: 1.3; font-weight: 650; }
+    .deployment { font-size: 0.75rem; color: var(--cp-text-muted); margin: 4px 0 16px; overflow-wrap: anywhere; }
+    .answer { flex: 1; margin: 0 0 20px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.9375rem; }
+    .metrics { margin: 0; padding-top: 12px; border-top: 1px solid var(--cp-border); font-size: 0.8125rem; }
+    .metric { display: flex; justify-content: space-between; gap: 12px; }
+    dt { color: var(--cp-text-muted); }
+    dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+    [hidden] { display: none !important; }
+    @media (max-width: 1100px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 600px) {
+      main { padding: 24px 16px; }
+      header { align-items: flex-start; flex-direction: column; gap: 12px; }
+      .auth { text-align: left; }
+      .cards { grid-template-columns: minmax(0, 1fr); }
+      .card { min-height: 280px; padding: 16px; }
+      .actions { align-items: flex-start; }
+      .input-label { flex-wrap: wrap; gap: 4px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>The AI Switchboard</h1>
+      <div class="auth">
+        <a id="sign-in" href="/.auth/login/github?post_login_redirect_uri=/">Sign in with GitHub</a>
+        <span id="auth-status" class="muted" role="status"></span>
+      </div>
+    </header>
+    <form id="prompt-form">
+      <p id="catalog-status" class="muted" role="status">Loading examples…</p>
+      <div id="examples" class="examples" role="group" aria-label="Example prompts"></div>
+      <div class="input-label">
+        <label for="prompt">Prompt</label>
+        <span id="character-count" class="muted">0 / 6,000</span>
+      </div>
+      <textarea id="prompt" name="text" maxlength="6000" required aria-describedby="character-count" placeholder="Choose an example, then edit the prompt." spellcheck="true"></textarea>
+      <div class="actions">
+        <button id="run" type="submit" disabled>Run</button>
+        <p id="status" class="muted" role="status" aria-live="polite"></p>
+      </div>
+    </form>
+    <section id="cards" class="cards" aria-label="Model responses"></section>
+    <noscript>JavaScript is required to load examples and run the models.</noscript>
+  </main>
+  <script>
+    (() => {
+      "use strict";
+      const modelOrder = ["decision", "astra", "luna", "sol"];
+      const initialNames = ["Decision One", "GPT-6 Astra", "GPT-6 Luna", "GPT-6 Sol"];
+      const signInUrl = "/.auth/login/github?post_login_redirect_uri=/";
+      const form = document.getElementById("prompt-form");
+      const prompt = document.getElementById("prompt");
+      const examples = document.getElementById("examples");
+      const runButton = document.getElementById("run");
+      const status = document.getElementById("status");
+      const catalogStatus = document.getElementById("catalog-status");
+      const signIn = document.getElementById("sign-in");
+      const authStatus = document.getElementById("auth-status");
+      const characterCount = document.getElementById("character-count");
+      const cards = new Map();
+      let models = [];
+      let scenarioId = null;
+      let authKnown = false;
+      let signedIn = false;
+      let running = false;
+
+      function element(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+
+      modelOrder.forEach((id, index) => {
+        const card = element("article", "card");
+        const heading = element("h2", "", initialNames[index]);
+        heading.id = "model-" + id;
+        card.setAttribute("aria-labelledby", heading.id);
+        const deployment = element("p", "deployment", "—");
+        const answer = element("p", "answer muted", "Ready.");
+        answer.setAttribute("aria-live", "polite");
+        const metrics = element("dl", "metrics");
+        const values = {};
+        [["latency", "Latency"], ["input", "Input tokens"], ["output", "Output tokens"]].forEach(([key, label]) => {
+          const row = element("div", "metric");
+          const value = element("dd", "", "—");
+          values[key] = value;
+          row.append(element("dt", "", label), value);
+          metrics.append(row);
+        });
+        card.append(heading, deployment, answer, metrics);
+        document.getElementById("cards").append(card);
+        cards.set(id, { card, heading, deployment, answer, values });
+      });
+
+      function updateRunButton() {
+        runButton.disabled = running || !authKnown || models.length !== 4 || !scenarioId;
+        runButton.textContent = running ? "Running…" : "Run";
+      }
+
+      function updateCount() {
+        characterCount.textContent = prompt.value.length.toLocaleString() + " / 6,000";
+      }
+      prompt.addEventListener("input", updateCount);
+
+      async function requestJson(url, options = {}, timeoutMs = 15000) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const response = await fetch(url, { ...options, credentials: "same-origin", signal: controller.signal });
+          let data;
+          try {
+            data = await response.json();
+          } catch {
+            const error = new Error(response.ok ? "The server returned an invalid response." : "Request failed (" + response.status + ").");
+            error.status = response.status;
+            throw error;
+          }
+          if (!response.ok) {
+            const error = new Error(typeof data?.error === "string" ? data.error : "Request failed (" + response.status + ").");
+            error.status = response.status;
+            throw error;
+          }
+          return data;
+        } catch (error) {
+          if (error.name === "AbortError") throw new Error("Request timed out. Please try again.");
+          throw error;
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+
+      async function loadAuth() {
+        try {
+          const data = await requestJson("/.auth/me");
+          signedIn = Boolean(data?.clientPrincipal);
+          signIn.hidden = signedIn;
+          authStatus.textContent = signedIn
+            ? (data.clientPrincipal.userDetails || "Signed in")
+            : "";
+          authKnown = true;
+        } catch {
+          authStatus.textContent = "Could not check sign-in. Sign in to continue.";
+          status.textContent = "Sign in with GitHub to continue.";
+          authKnown = true;
+          signedIn = false;
+        }
+        updateRunButton();
+      }
+
+      async function loadCatalog() {
+        try {
+          const data = await requestJson("/api/catalog");
+          if (!Array.isArray(data?.models) || !Array.isArray(data?.scenarios)) {
+            throw new Error("The catalog is invalid.");
+          }
+          const ordered = modelOrder.map(id => data.models.find(model => model.id === id));
+          if (ordered.some(model => !model || typeof model.name !== "string" || typeof model.deployment !== "string")) {
+            throw new Error("The catalog must include all four models.");
+          }
+          const scenarios = data.scenarios.slice(0, 8);
+          if (scenarios.length !== 8 || scenarios.some(scenario =>
+            typeof scenario.id !== "string" || typeof scenario.title !== "string" ||
+            typeof scenario.text !== "string" || scenario.text.length > 6000)) {
+            throw new Error("The catalog must include eight valid examples.");
+          }
+          models = ordered;
+          models.forEach(model => {
+            const view = cards.get(model.id);
+            view.heading.textContent = model.name;
+            view.deployment.textContent = model.deployment || "—";
+          });
+          scenarios.forEach((scenario, index) => {
+            const button = element("button", "", scenario.title);
+            button.type = "button";
+            button.setAttribute("aria-pressed", "false");
+            button.addEventListener("click", () => {
+              scenarioId = scenario.id;
+              prompt.value = scenario.text;
+              for (const other of examples.children) {
+                other.setAttribute("aria-pressed", String(other === button));
+              }
+              updateCount();
+              updateRunButton();
+            });
+            examples.append(button);
+            if (index === 0) button.click();
+          });
+          catalogStatus.textContent = "";
+        } catch (error) {
+          models = [];
+          catalogStatus.className = "error";
+          catalogStatus.textContent = "Could not load examples: " + error.message + " Reload to try again.";
+        }
+        updateRunButton();
+      }
+
+      function metric(value, suffix = "") {
+        return typeof value === "number" && Number.isFinite(value) && value >= 0
+          ? value.toLocaleString(undefined, { maximumFractionDigits: 0 }) + suffix
+          : "—";
+      }
+
+      async function runModel(model, selectedScenarioId, text) {
+        const view = cards.get(model.id);
+        try {
+          const data = await requestJson("/api/run", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ modelId: model.id, scenarioId: selectedScenarioId, text })
+          }, 180000);
+          if (data?.modelId !== model.id || typeof data.answer !== "string") {
+            throw new Error("The server returned an invalid model response.");
+          }
+          view.heading.textContent = typeof data.model === "string" ? data.model : model.name;
+          view.deployment.textContent = typeof data.deployment === "string" ? data.deployment : model.deployment;
+          view.answer.className = "answer";
+          view.answer.textContent = data.answer;
+          view.values.latency.textContent = metric(data.latencyMs, " ms");
+          view.values.input.textContent = metric(data.inputTokens);
+          view.values.output.textContent = metric(data.outputTokens);
+        } catch (error) {
+          view.answer.className = "answer error";
+          if (error.status === 401) {
+            signedIn = false;
+            signIn.hidden = false;
+            authStatus.textContent = "Your session has expired.";
+            view.answer.textContent = "Sign in with GitHub, then run again.";
+          } else if (error.status === 403) {
+            view.answer.textContent = "Permission denied. Your GitHub account is not allowed to use this demo.";
+          } else {
+            view.answer.textContent = error.message || "Request failed. Please try again.";
+          }
+          throw error;
+        } finally {
+          view.card.setAttribute("aria-busy", "false");
+        }
+      }
+
+      form.addEventListener("submit", async event => {
+        event.preventDefault();
+        if (running || !authKnown || models.length !== 4 || !scenarioId) return;
+        if (!signedIn) {
+          window.location.assign(signInUrl);
+          return;
+        }
+        const text = prompt.value;
+        if (!text.trim() || text.length > 6000) {
+          status.className = "error";
+          status.textContent = "Enter a prompt of 1–6,000 characters.";
+          prompt.focus();
+          return;
+        }
+        const selectedScenarioId = scenarioId;
+        running = true;
+        updateRunButton();
+        status.className = "muted";
+        status.textContent = "Running all four models…";
+        for (const view of cards.values()) {
+          view.card.setAttribute("aria-busy", "true");
+          view.answer.className = "answer muted";
+          view.answer.textContent = "Running…";
+          for (const value of Object.values(view.values)) value.textContent = "—";
+        }
+        try {
+          const results = await Promise.allSettled(models.map(model => runModel(model, selectedScenarioId, text)));
+          const failures = results.filter(result => result.status === "rejected");
+          if (failures.some(result => result.reason.status === 401)) {
+            status.className = "error";
+            status.textContent = "Sign in with GitHub to run again. Completed responses are shown below.";
+          } else if (failures.some(result => result.reason.status === 403)) {
+            status.className = "error";
+            status.textContent = "Permission denied. Your GitHub account needs access to this demo.";
+          } else if (failures.length) {
+            status.className = "error";
+            status.textContent = failures.length + " of 4 requests failed. Run again to retry.";
+          } else {
+            status.textContent = "Complete.";
+          }
+        } finally {
+          running = false;
+          updateRunButton();
+        }
+      });
+
+      loadAuth();
+      loadCatalog();
+    })();
+  </script>
+</body>
+</html>
