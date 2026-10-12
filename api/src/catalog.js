@@ -1,8 +1,8 @@
 const modelDefinitions = Object.freeze([
   Object.freeze({ id: 'decision', name: 'Microsoft Decision One', deployment: 'Decision-1', setting: 'DECISION_DEPLOYMENT' }),
   Object.freeze({ id: 'astra', name: 'GPT-6 Astra', deployment: 'gpt-6-astra', setting: 'ASTRA_DEPLOYMENT' }),
-  Object.freeze({ id: 'luna', name: 'GPT-6 Luna', deployment: 'gpt-6-luna', setting: 'LUNA_DEPLOYMENT' }),
   Object.freeze({ id: 'sol', name: 'GPT-6 Sol', deployment: 'gpt-6-sol', setting: 'SOL_DEPLOYMENT' }),
+  Object.freeze({ id: 'luna', name: 'GPT-6 Luna', deployment: 'gpt-6-luna', setting: 'LUNA_DEPLOYMENT' }),
 ]);
 
 const ticketCriteria = Object.freeze({

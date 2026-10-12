@@ -48,7 +48,7 @@ const hasStatus = (status) => (error) => error instanceof ApiError && error.stat
 test('public catalog has four allowlisted models and eight fictional scenarios', () => {
   const result = handleCatalog();
   assert.equal(result.status, 200);
-  assert.deepEqual(result.jsonBody.models.map(({ id }) => id), ['decision', 'astra', 'luna', 'sol']);
+  assert.deepEqual(result.jsonBody.models.map(({ id }) => id), ['decision', 'astra', 'sol', 'luna']);
   assert.equal(result.jsonBody.scenarios.length, 8);
   for (const scenario of result.jsonBody.scenarios) {
     assert.ok(scenario.text.length > 0 && scenario.text.length <= 6000);

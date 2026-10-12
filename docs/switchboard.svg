@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1120" height="620" viewBox="0 0 1120 620" role="img" aria-labelledby="title description">
   <title id="title">The AI Switchboard: one case, four models</title>
-  <desc id="description">An illustrative loop sends a fictional duplicate-charge ticket to Microsoft Decision One, GPT-6 Astra, GPT-6 Luna and GPT-6 Sol in parallel. All four display Billing. Animation timing is illustrative, not measured model performance.</desc>
+  <desc id="description">An illustrative loop sends a fictional duplicate-charge ticket to Microsoft Decision One, GPT-6 Astra, GPT-6 Sol and GPT-6 Luna in parallel. All four display Billing. Animation timing is illustrative, not measured model performance.</desc>
   <style>
     :root {
       color-scheme: light;
@@ -116,8 +116,8 @@
   </g>
   <g transform="translate(568 356)">
     <rect class="surface" width="248" height="184" rx="16"/>
-    <text class="model" x="20" y="35">GPT-6 Luna</text>
-    <text class="small subtle" x="20" y="58">gpt-6-luna</text>
+    <text class="model" x="20" y="35">GPT-6 Sol</text>
+    <text class="small subtle" x="20" y="58">gpt-6-sol</text>
     <text class="body muted pending" x="20" y="109">Classifying...</text>
     <g class="result">
       <text class="answer" x="20" y="109">Billing</text>
@@ -128,8 +128,8 @@
   </g>
   <g transform="translate(832 356)">
     <rect class="surface" width="248" height="184" rx="16"/>
-    <text class="model" x="20" y="35">GPT-6 Sol</text>
-    <text class="small subtle" x="20" y="58">gpt-6-sol</text>
+    <text class="model" x="20" y="35">GPT-6 Luna</text>
+    <text class="small subtle" x="20" y="58">gpt-6-luna</text>
     <text class="body muted pending" x="20" y="109">Classifying...</text>
     <g class="result">
       <text class="answer" x="20" y="109">Billing</text>

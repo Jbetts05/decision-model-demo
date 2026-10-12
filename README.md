@@ -1,6 +1,6 @@
 # The AI Switchboard
 
-![An animated illustration of one ticket classified by Microsoft Decision One, GPT-6 Astra, GPT-6 Luna and GPT-6 Sol in parallel](docs/switchboard.svg)
+![An animated illustration of one ticket classified by Microsoft Decision One, GPT-6 Astra, GPT-6 Sol and GPT-6 Luna in parallel](docs/switchboard.svg)
 
 What happens when a decision model and three language models tackle the same
 classification task? Pick a case, run all four, and compare for yourself.
@@ -14,6 +14,10 @@ reasoning.
 No scores, rankings, winners, or cost estimates. The UI shows the question and
 possible labels, not an expected-answer key. The animation above is illustrative;
 its timing is not a benchmark or a claim that any model is faster.
+
+Cards are ordered **Decision One / Astra / Sol / Luna**. The GPT models follow
+their positioning: frontier, general-purpose, then fast and cost-efficient.
+This is not a parameter-size ranking.
 
 ## Try it
 
@@ -46,8 +50,8 @@ Browser: plain HTML, CSS and JavaScript
         |
         +-- Microsoft Decision One: native choice question
         +-- GPT-6 Astra: strict JSON output
-        +-- GPT-6 Luna:  strict JSON output
         +-- GPT-6 Sol:   strict JSON output
+        +-- GPT-6 Luna:  strict JSON output
 ```
 
 No frontend framework, build step, database, or containers. Model credentials stay
@@ -67,9 +71,9 @@ source files or the browser.
 | `FOUNDRY_ENDPOINT` | Azure application setting: your Foundry resource endpoint |
 | `FOUNDRY_API_KEY` | Azure application setting: your Foundry API key |
 
-Deployment names default to `Decision-1`, `gpt-6-astra`, `gpt-6-luna`, and
-`gpt-6-sol`. Override them with the Azure application settings
-`DECISION_DEPLOYMENT`, `ASTRA_DEPLOYMENT`, `LUNA_DEPLOYMENT`, and `SOL_DEPLOYMENT`
+Deployment names default to `Decision-1`, `gpt-6-astra`, `gpt-6-sol`, and
+`gpt-6-luna`. Override them with the Azure application settings
+`DECISION_DEPLOYMENT`, `ASTRA_DEPLOYMENT`, `SOL_DEPLOYMENT`, and `LUNA_DEPLOYMENT`
 if needed. See the [API documentation](api/README.md) for request shapes and limits.
 
 The [GitHub Actions workflow](.github/workflows/deploy.yml) runs the API tests and
