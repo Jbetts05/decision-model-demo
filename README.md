@@ -1,52 +1,93 @@
 # The AI Switchboard
 
-A tiny live comparison of Microsoft Decision One, GPT-6 Astra, GPT-6 Luna and
-GPT-6 Sol. Select an example, edit the text, and run all four models in parallel.
-Cards show the answer, deployment, request latency, and API-reported tokens.
-There are no costs, winners, rankings, or stored submissions.
-Each example shows its classification question and possible labels. A compact
-Details inspector on each result shows the actual context, schema, and model
-output. These are observable API inputs and outputs, not internal reasoning.
+[![An animated illustration of one ticket classified by Microsoft Decision One, GPT-6 Astra, GPT-6 Luna and GPT-6 Sol in parallel](docs/switchboard.svg)](https://blue-grass-0a2849303.3.azurestaticapps.net)
 
-## Deployment
+**[Open the live demo](https://blue-grass-0a2849303.3.azurestaticapps.net)** - no sign-in required.
 
-The `web/` page and managed Node.js 22 Azure Functions API deploy together to
-Azure Static Web Apps. Every push to `main` runs the API tests and deploys through
-GitHub Actions. No frontend build, database, containers, or local package install.
+What happens when a decision model and three language models tackle the same
+classification task? Pick a case, run all four, and compare for yourself.
 
-GitHub Actions requires the repository secret `AZURE_STATIC_WEB_APPS_API_TOKEN`.
-The API requires these encrypted Static Web Apps application settings:
+Eight editable, fictional examples cover **ticket routing**, **complaint
+classification**, and **agent selection**. Each model's card shows its answer,
+deployment, request latency, and API-reported input/output tokens. Expand
+**Context / schema / output** to inspect the actual context, schema, and output - not internal
+reasoning.
+
+No scores, rankings, winners, or cost estimates. The UI shows the question and
+possible labels, not an expected-answer key. The animation above is illustrative;
+its timing is not a benchmark or a claim that any model is faster.
+
+## Try it
+
+1. Choose an example and optionally edit its text.
+2. Select **Run comparison** to make four parallel requests.
+3. Compare the labels, latency, and tokens; open **Context / schema / output** to see what was sent and returned.
+
+Submissions are not stored by this application. Text is sent to the configured
+Foundry models for inference; use fictional or non-sensitive examples on this
+public demo.
+
+## What the numbers mean
+
+| Metric | Meaning |
+| --- | --- |
+| Latency | Server-to-Foundry request time through receipt of the complete response; excludes the browser round trip and API cold start. |
+| Input tokens | Usage reported by each model API, not a local estimate. GPT receives chat instructions and a strict JSON output schema; Decision One receives a native choice question, so counts need not match. |
+| Output tokens | API-reported usage, including any reported GPT reasoning tokens. The GPT JSON wrapper also contributes tokens. Missing usage appears as a dash. |
+
+Astra uses its lowest supported reasoning effort, `low`; Luna and Sol use `none`.
+This is a hands-on comparison, not a controlled accuracy or performance benchmark:
+the APIs, prompt representations, and output formats differ, and latency varies.
+
+## How it works
+
+```text
+Browser: plain HTML, CSS and JavaScript
+  |
+  +-- Azure Static Web Apps managed Functions API (Node.js 22)
+        |
+        +-- Microsoft Decision One: native choice question
+        +-- GPT-6 Astra: strict JSON output
+        +-- GPT-6 Luna:  strict JSON output
+        +-- GPT-6 Sol:   strict JSON output
+```
+
+No frontend framework, build step, database, or containers. Model credentials stay
+server-side; the browser never receives the Foundry key. GitHub hosts the source;
+Azure Static Web Apps hosts the page and API together.
+
+## Deploy your own
+
+Use an Azure Static Web App with a managed Node.js 22 Functions API and a Foundry
+resource containing the four model deployments. Configure the GitHub repository
+secret and encrypted Azure application settings below; never put their values in
+source files or the browser.
 
 | Setting | Value |
 | --- | --- |
-| `FOUNDRY_ENDPOINT` | Existing Foundry resource endpoint |
-| `FOUNDRY_API_KEY` | Existing Foundry API key, never committed |
+| `AZURE_STATIC_WEB_APPS_API_TOKEN` | GitHub Actions repository secret for your Static Web App |
+| `FOUNDRY_ENDPOINT` | Azure application setting: your Foundry resource endpoint |
+| `FOUNDRY_API_KEY` | Azure application setting: your Foundry API key |
 
 Deployment names default to `Decision-1`, `gpt-6-astra`, `gpt-6-luna`, and
-`gpt-6-sol`. Model credentials stay server-side. The page and sample catalog are
-public, including live inference. Share the site URL directly with colleagues;
-no sign-in, invitation, access code, or GitHub account is required.
-Existing Foundry usage charges still apply to public requests.
+`gpt-6-sol`. Override them with the Azure application settings
+`DECISION_DEPLOYMENT`, `ASTRA_DEPLOYMENT`, `LUNA_DEPLOYMENT`, and `SOL_DEPLOYMENT`
+if needed. See the [API documentation](api/README.md) for request shapes and limits.
 
-For the approved Azure subscription and receipt benchmark resource, run
-`scripts\provision.ps1` after creating the private repository. It provisions only
-the Free Static Web App, configures the existing Foundry credential server-side,
-and pipes the deployment token directly into the repository secret. Azure CLI
-and GitHub CLI must already be signed in. Then push to `main`.
+The [GitHub Actions workflow](.github/workflows/deploy.yml) runs the API tests and
+deploys `web/` and `api/` on pushes to `main`. Cloud deployment installs the
+Functions runtime dependency in its isolated build environment.
 
-Latency measures server-to-Foundry request time through receipt of the complete
-response. It excludes the browser round trip and API cold start. Tokens are
-reported by each model API, not locally estimated; missing usage is shown as a
-dash. GPT output tokens include any reported reasoning tokens. Astra uses its
-lowest supported reasoning effort, `low`; Luna and Sol use `none`. The different
-APIs and prompt representations mean token counts need not match.
+The `scripts\provision.ps1` helper targets the maintainer's existing Azure
+environment, including a fixed Foundry resource. It is not a generic setup script;
+do not run it unchanged for your own deployment. The [Bicep template](infra/main.bicep)
+creates only the Static Web App, not the Foundry resource or model deployments.
 
-Each request has a 40-second model timeout, below the managed API's 45-second
-limit. Errors appear only in the affected card. The demo uses existing billable
-Foundry deployments even though the interface does not display cost.
-The API caps public usage at 16 concurrent requests and 96 requests per minute
-per API instance. This lightweight in-memory guard is shared across visitors,
-resets on restart, and is not a global quota across scaled-out instances.
+**Public inference is billable.** The deployed demo is anonymous, and visitors
+consume the owner's Foundry quota. Its guard allows 16 concurrent requests and 96
+starts per minute per API instance; restarts reset it, and scaled instances have
+independent counters. This is not a global quota or spending cap. Each request has
+a 40-second model timeout, and failures appear in the affected card.
 
 ## Tests
 
@@ -55,6 +96,3 @@ node --test api\test\core.test.js
 ```
 
 Tests use Node's built-in runner and do not require a dependency installation.
-Cloud deployment installs the Functions runtime dependency in its isolated build
-environment. Keep the repository private unless its contents are reviewed for
-public release.
