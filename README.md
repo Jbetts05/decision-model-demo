@@ -1,8 +1,6 @@
 # The AI Switchboard
 
-[![An animated illustration of one ticket classified by Microsoft Decision One, GPT-6 Astra, GPT-6 Luna and GPT-6 Sol in parallel](docs/switchboard.svg)](https://blue-grass-0a2849303.3.azurestaticapps.net)
-
-**[Open the live demo](https://blue-grass-0a2849303.3.azurestaticapps.net)** - no sign-in required.
+![An animated illustration of one ticket classified by Microsoft Decision One, GPT-6 Astra, GPT-6 Luna and GPT-6 Sol in parallel](docs/switchboard.svg)
 
 What happens when a decision model and three language models tackle the same
 classification task? Pick a case, run all four, and compare for yourself.
