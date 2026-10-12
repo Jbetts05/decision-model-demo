@@ -1,21 +1,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  ApiError, MAX_BODY_BYTES, authenticate, readJson, validateInput, buildModelRequest,
+  ApiError, MAX_BODY_BYTES, readJson, validateInput, buildModelRequest,
   getUsage, getAnswer, runModel, createLimiter, handleCatalog, createRunHandler,
 } = require('../src/core');
 const { getCatalog, scenarios } = require('../src/catalog');
 
 const env = {
-  ALLOWED_GITHUB_USERS: 'Jbetts05, second-user',
   FOUNDRY_API_KEY: 'test-only-key',
 };
-const principal = {
-  identityProvider: 'github',
-  userDetails: 'Jbetts05',
-  userRoles: ['anonymous', 'authenticated'],
-};
-const encodedPrincipal = (value = principal) => Buffer.from(JSON.stringify(value)).toString('base64');
 const body = (overrides = {}) => ({
   modelId: 'astra',
   scenarioId: 'ticket-duplicate-charge',
@@ -26,7 +19,6 @@ const request = (value = body(), headers = {}) => new Request('https://demo.exam
   method: 'POST',
   headers: {
     'content-type': 'application/json',
-    'x-ms-client-principal': encodedPrincipal(),
     ...headers,
   },
   body: typeof value === 'string' ? value : JSON.stringify(value),
@@ -78,37 +70,48 @@ test('deployment overrides stay server-side and catalog is an isolated copy', ()
   assert.notEqual(scenarios[0].criteria.Billing, 'changed');
 });
 
-test('authenticated GitHub allowlist matches case-insensitively', () => {
-  assert.equal(authenticate(request(), env), 'jbetts05');
-  assert.equal(authenticate(request(body(), {
-    'x-ms-client-principal': encodedPrincipal({ ...principal, userDetails: 'SECOND-USER' }),
-  }), env), 'second-user');
+test('anonymous requests succeed with no principal, cookies, or access allowlist', async () => {
+  const handler = createRunHandler({ env, fetchImpl: successFetch });
+  assert.equal((await handler(request())).status, 200);
 });
 
-test('access fails closed for missing or malformed allowlist configuration', () => {
-  for (const users of [undefined, '', '  ', 'Jbetts05,', 'https://github.com/Jbetts05']) {
-    assert.throws(() => authenticate(request(), { ALLOWED_GITHUB_USERS: users }), hasStatus(503));
+test('caller-provided principal and cookie headers are ignored', async () => {
+  const handler = createRunHandler({ env, fetchImpl: successFetch });
+  for (const header of ['', '%%%', 'e30', 'a'.repeat(8200)]) {
+    assert.equal((await handler(request(body(), {
+      'x-ms-client-principal': header, cookie: 'untrusted=value',
+    }))).status, 200);
   }
 });
 
-test('missing, malformed, noncanonical, or invalid UTF-8 principal is rejected', () => {
-  for (const header of ['', '%%%', 'e30', Buffer.from('not json').toString('base64'),
-    Buffer.from([0xff, 0xfe]).toString('base64'),
-    `${encodedPrincipal().slice(0, 10)} ${encodedPrincipal().slice(10)}`, 'a'.repeat(8200)]) {
-    assert.throws(() => authenticate(request(body(), { 'x-ms-client-principal': header }), env), hasStatus(401));
+test('invalid public input is rejected before acquiring budget or fetching', async () => {
+  let acquired = 0;
+  let fetched = 0;
+  const handler = createRunHandler({
+    env,
+    acquire: () => { acquired += 1; return () => {}; },
+    fetchImpl: async () => { fetched += 1; return successFetch(); },
+  });
+  for (const value of [body({ modelId: 'unknown' }), body({ scenarioId: 'unknown' }),
+    body({ endpoint: 'https://example.com' }), body({ text: '' }), '{invalid']) {
+    assert.equal((await handler(request(value))).status, 400);
   }
-  assert.throws(() => authenticate({ headers: new Headers() }, env), hasStatus(401));
+  assert.equal((await handler(request('x'.repeat(MAX_BODY_BYTES + 1)))).status, 413);
+  assert.equal((await handler(request(body(), { 'content-type': 'text/plain' }))).status, 415);
+  assert.equal(acquired, 0);
+  assert.equal(fetched, 0);
 });
 
-test('only GitHub provider, authenticated role, and username principal are accepted', () => {
-  for (const value of [null, [], { ...principal, identityProvider: 'aad' },
-    { ...principal, userRoles: ['anonymous'] }, { ...principal, userRoles: 'authenticated' },
-    { ...principal, userDetails: 'person@example.com' }, { ...principal, userDetails: 123 }]) {
-    assert.throws(() => authenticate(request(body(), { 'x-ms-client-principal': encodedPrincipal(value) }), env), hasStatus(401));
+test('public handler shares its start budget regardless of caller headers', async () => {
+  const handler = createRunHandler({ env, wallClock: () => 0, fetchImpl: successFetch });
+  for (let i = 0; i < 96; i += 1) {
+    assert.equal((await handler(request(body(), {
+      'x-ms-client-principal': `caller-${i}`, 'x-forwarded-for': `192.0.2.${i}`,
+    }))).status, 200);
   }
-  assert.throws(() => authenticate(request(body(), {
-    'x-ms-client-principal': encodedPrincipal({ ...principal, userDetails: 'someone-else' }),
-  }), env), hasStatus(403));
+  const result = await handler(request());
+  assert.equal(result.status, 429);
+  assert.match(result.jsonBody.error, /shared by everyone.*Try again/);
 });
 
 test('JSON parsing accepts charset and rejects non-JSON or malformed JSON', async () => {
@@ -268,6 +271,8 @@ test('Decision maps the confirmed live schema and preserves its exact label casi
 test('latency includes reading full upstream response and fetch is bounded with no redirect', async () => {
   let time = 100;
   let calls = 0;
+  let sentBody;
+  const providerPayload = { ...chatPayload(), model: 'gpt-6-astra' };
   const result = await runModel(input(), env, {
     now: () => time,
     fetchImpl: async (url, options) => {
@@ -275,31 +280,59 @@ test('latency includes reading full upstream response and fetch is bounded with 
       assert.equal(options.method, 'POST');
       assert.equal(options.redirect, 'error');
       assert.ok(options.signal instanceof AbortSignal);
-      assert.equal(JSON.parse(options.body).model, 'gpt-6-astra');
+      sentBody = JSON.parse(options.body);
+      assert.equal(sentBody.model, 'gpt-6-astra');
       time = 115;
-      return { ok: true, json: async () => { time = 145.125; return chatPayload(); } };
+      return { ok: true, json: async () => { time = 145.125; return providerPayload; } };
     },
   });
   assert.deepEqual(result, {
     modelId: 'astra', model: 'GPT-6 Astra', deployment: 'gpt-6-astra',
     answer: 'Billing', latencyMs: 45.13, inputTokens: 34, outputTokens: 8,
+    details: {
+      context: {
+        messages: sentBody.messages,
+        reasoning_effort: sentBody.reasoning_effort,
+        max_completion_tokens: sentBody.max_completion_tokens,
+      },
+      schema: sentBody.response_format,
+      output: { model: providerPayload.model, choices: providerPayload.choices, usage: providerPayload.usage },
+    },
   });
+  assert.ok(!JSON.stringify(result).includes(env.FOUNDRY_API_KEY));
   assert.equal(calls, 1);
 });
 
 test('Decision requests map usage and unknown token counts remain null', async () => {
+  let sentBody;
   const result = await runModel(input({ modelId: 'decision' }), env, {
-    fetchImpl: async () => new Response(JSON.stringify(decisionPayload())),
+    fetchImpl: async (url, options) => {
+      sentBody = JSON.parse(options.body);
+      return new Response(JSON.stringify(decisionPayload()));
+    },
   });
   assert.equal(result.model, 'Microsoft Decision One');
   assert.equal(result.answer, 'Billing');
   assert.equal(result.inputTokens, 37);
   assert.equal(result.outputTokens, 9);
+  assert.deepEqual(result.details, {
+    context: { state: sentBody.state },
+    schema: { questions: sentBody.questions },
+    output: {
+      model: decisionPayload().model, answers: decisionPayload().answers, usage: decisionPayload().usage,
+    },
+  });
+  assert.equal(result.confidence, undefined);
+  assert.equal(result.probabilities, undefined);
+  assert.ok(!JSON.stringify(result).includes(env.FOUNDRY_API_KEY));
   const missing = await runModel(input(), env, {
     fetchImpl: async () => new Response(JSON.stringify({ choices: chatPayload().choices })),
   });
   assert.equal(missing.inputTokens, null);
   assert.equal(missing.outputTokens, null);
+  assert.equal(missing.details.output.model, undefined);
+  assert.equal(missing.details.output.usage, undefined);
+  assert.deepEqual(JSON.parse(JSON.stringify(missing.details.output)), { choices: chatPayload().choices });
 });
 
 test('upstream errors map to readable statuses without retries or body leakage', async () => {
@@ -346,26 +379,28 @@ test('fetch timeout and timeout during full response reading produce 504', async
   }), hasStatus(504));
 });
 
-test('per-instance limiter allows four concurrent requests and releases capacity', () => {
+test('per-instance limiter shares 16 concurrent requests and releases capacity once', () => {
   const acquire = createLimiter(() => 0);
-  const release = Array.from({ length: 4 }, () => acquire('one-user'));
-  assert.throws(() => acquire('one-user'), hasStatus(429));
-  const releaseOther = acquire('another-user');
+  const release = Array.from({ length: 16 }, () => acquire());
+  assert.throws(() => acquire(), hasStatus(429));
   release[0]();
-  acquire('one-user')();
-  releaseOther();
+  release[0]();
+  const replacement = acquire();
+  assert.throws(() => acquire(), hasStatus(429));
+  replacement();
   release.slice(1).forEach((done) => done());
 });
 
-test('rolling limiter permits 24 starts per minute and resets expired windows', () => {
+test('rolling limiter permits 96 starts per minute and cleans expired windows', () => {
   let time = 0;
   const acquire = createLimiter(() => time);
-  for (let i = 0; i < 24; i += 1) acquire('one-user')();
-  assert.throws(() => acquire('one-user'), hasStatus(429));
+  for (let i = 0; i < 96; i += 1) acquire()();
+  assert.throws(() => acquire(), hasStatus(429));
   time = 59999;
-  assert.throws(() => acquire('one-user'), hasStatus(429));
+  assert.throws(() => acquire(), hasStatus(429));
   time = 60000;
-  acquire('one-user')();
+  for (let i = 0; i < 96; i += 1) acquire()();
+  assert.throws(() => acquire(), hasStatus(429));
 });
 
 test('handler returns safe error envelope and never logs secret exception details', async () => {
@@ -381,15 +416,19 @@ test('handler returns safe error envelope and never logs secret exception detail
   assert.ok(!JSON.stringify({ logs, result }).includes(env.FOUNDRY_API_KEY));
 });
 
-test('handler authenticates before body reading or fetching', async () => {
+test('handler checks method before body reading, budget acquisition, or fetching', async () => {
   let called = false;
-  const handler = createRunHandler({ env, fetchImpl: async () => { called = true; } });
+  const handler = createRunHandler({
+    env,
+    acquire: () => { called = true; },
+    fetchImpl: async () => { called = true; },
+  });
   const result = await handler({
-    method: 'POST',
+    method: 'GET',
     headers: new Headers(),
     text: async () => { throw new Error('Body must not be read'); },
   });
-  assert.equal(result.status, 401);
+  assert.equal(result.status, 405);
   assert.equal(called, false);
 });
 
@@ -403,7 +442,12 @@ test('handler success envelope and four-model parallel request admission', async
     handler(request(body({ modelId })))));
   assert.ok(results.every((result) => result.status === 200));
   assert.deepEqual(Object.keys(results[0].jsonBody),
-    ['modelId', 'model', 'deployment', 'answer', 'latencyMs', 'inputTokens', 'outputTokens']);
+    ['modelId', 'model', 'deployment', 'answer', 'latencyMs', 'inputTokens', 'outputTokens', 'details']);
+  for (const result of results.slice(1)) {
+    const modelId = result.jsonBody.modelId;
+    assert.equal(result.jsonBody.details.context.reasoning_effort, modelId === 'astra' ? 'low' : 'none');
+    assert.equal(result.jsonBody.details.context.max_completion_tokens, modelId === 'astra' ? 1024 : 512);
+  }
 });
 
 test('handler releases concurrency after upstream failures and rejects incorrect method', async () => {
@@ -411,7 +455,7 @@ test('handler releases concurrency after upstream failures and rejects incorrect
     env,
     fetchImpl: async () => { throw new Error('network failure'); },
   });
-  for (let i = 0; i < 6; i += 1) assert.equal((await handler(request())).status, 502);
+  for (let i = 0; i < 20; i += 1) assert.equal((await handler(request())).status, 502);
   assert.equal((await handler({ method: 'GET' })).status, 405);
 });
 

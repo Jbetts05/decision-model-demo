@@ -3,8 +3,7 @@ param(
     [string]$ResourceGroup = 'rg-receipt-benchmark',
     [string]$Name = 'decision-model-demo',
     [string]$Location = 'westeurope',
-    [string]$Repository = 'Jbetts05/decision-model-demo',
-    [string]$AllowedGitHubUsers = 'Jbetts05'
+    [string]$Repository = 'Jbetts05/decision-model-demo'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,8 +30,7 @@ try {
     az staticwebapp appsettings set --subscription $Subscription --resource-group $ResourceGroup `
         --name $Name --setting-names `
         "FOUNDRY_ENDPOINT=https://aireceiptbench556dc8.services.ai.azure.com" `
-        "FOUNDRY_API_KEY=$foundryKey" `
-        "ALLOWED_GITHUB_USERS=$AllowedGitHubUsers" --output none
+        "FOUNDRY_API_KEY=$foundryKey" --output none
     if ($LASTEXITCODE -ne 0) { throw 'Unable to configure API application settings.' }
 } finally {
     $foundryKey = $null

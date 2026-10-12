@@ -3,7 +3,6 @@ const { getCatalog, getModels, scenarios } = require('./catalog');
 
 const MAX_BODY_BYTES = 32 * 1024;
 const DEFAULT_ENDPOINT = 'https://aireceiptbench556dc8.services.ai.azure.com';
-const USERNAME_PATTERN = /^[a-z\d](?:[a-z\d-]{0,38})$/i;
 
 class ApiError extends Error {
   constructor(status, code, message, upstreamStatus) {
@@ -13,41 +12,6 @@ class ApiError extends Error {
     this.code = code;
     this.upstreamStatus = upstreamStatus;
   }
-}
-
-function authenticate(request, env) {
-  const configured = env.ALLOWED_GITHUB_USERS;
-  if (typeof configured !== 'string' || !configured.trim()) {
-    throw new ApiError(503, 'AUTH_CONFIGURATION', 'API access is not configured.');
-  }
-  const usernames = configured.split(',').map((name) => name.trim().toLowerCase());
-  if (usernames.some((name) => !USERNAME_PATTERN.test(name))) {
-    throw new ApiError(503, 'AUTH_CONFIGURATION', 'API access is not configured.');
-  }
-
-  const encoded = request.headers.get('x-ms-client-principal');
-  let principal;
-  try {
-    if (typeof encoded !== 'string' || encoded.length > 8192 || !encoded.length ||
-        encoded.length % 4 !== 0 || !/^[A-Za-z\d+/]+={0,2}$/.test(encoded)) {
-      throw new Error('Invalid principal encoding');
-    }
-    const bytes = Buffer.from(encoded, 'base64');
-    if (bytes.toString('base64') !== encoded) throw new Error('Invalid principal encoding');
-    principal = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-  } catch {
-    throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in with an authorized GitHub account.');
-  }
-  if (!principal || Array.isArray(principal) || principal.identityProvider !== 'github' ||
-      !Array.isArray(principal.userRoles) || !principal.userRoles.includes('authenticated') ||
-      typeof principal.userDetails !== 'string' || !USERNAME_PATTERN.test(principal.userDetails)) {
-    throw new ApiError(401, 'UNAUTHENTICATED', 'Sign in with an authorized GitHub account.');
-  }
-  const username = principal.userDetails.toLowerCase();
-  if (!usernames.includes(username)) {
-    throw new ApiError(403, 'FORBIDDEN', 'This GitHub account is not authorized to run models.');
-  }
-  return username;
 }
 
 async function readJson(request) {
@@ -251,6 +215,7 @@ async function runModel(input, env, dependencies = {}) {
     throw new ApiError(502, 'UPSTREAM_NETWORK', 'Unable to reach the model service. Try again later.');
   }
   const latencyMs = Math.max(0, Math.round((now() - start) * 100) / 100);
+  const isDecision = input.model.id === 'decision';
   return {
     modelId: input.model.id,
     model: input.model.name,
@@ -258,25 +223,39 @@ async function runModel(input, env, dependencies = {}) {
     answer: getAnswer(payload, input),
     latencyMs,
     ...getUsage(payload),
+    details: {
+      context: isDecision
+        ? { state: prepared.body.state }
+        : {
+          messages: prepared.body.messages,
+          reasoning_effort: prepared.body.reasoning_effort,
+          max_completion_tokens: prepared.body.max_completion_tokens,
+        },
+      schema: isDecision
+        ? { questions: prepared.body.questions }
+        : prepared.body.response_format,
+      output: isDecision
+        ? { model: payload.model, answers: payload.answers, usage: payload.usage }
+        : { model: payload.model, choices: payload.choices, usage: payload.usage },
+    },
   };
 }
 
 function createLimiter(now = Date.now) {
-  const users = new Map();
-  return function acquire(username) {
+  const entry = { active: 0, starts: [] };
+  return function acquire() {
     const currentTime = now();
-    for (const [name, entry] of users) {
-      entry.starts = entry.starts.filter((time) => time > currentTime - 60000);
-      if (entry.active === 0 && entry.starts.length === 0) users.delete(name);
-    }
-    const entry = users.get(username) || { active: 0, starts: [] };
-    if (entry.active >= 4 || entry.starts.length >= 24) {
-      throw new ApiError(429, 'LOCAL_RATE_LIMIT', 'This instance allows four concurrent requests and 24 requests per minute per user.');
+    entry.starts = entry.starts.filter((time) => time > currentTime - 60000);
+    if (entry.active >= 16 || entry.starts.length >= 96) {
+      throw new ApiError(429, 'LOCAL_RATE_LIMIT', 'This demo instance allows 16 concurrent requests and 96 starts per minute, shared by everyone. Try again after active requests finish or in one minute.');
     }
     entry.active += 1;
     entry.starts.push(currentTime);
-    users.set(username, entry);
-    return () => { entry.active -= 1; };
+    let released = false;
+    return () => {
+      if (!released) entry.active -= 1;
+      released = true;
+    };
   };
 }
 
@@ -295,10 +274,9 @@ function createRunHandler(dependencies = {}) {
     let release;
     try {
       if (request.method !== 'POST') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use POST for model requests.');
-      const username = authenticate(request, env);
       const input = validateInput(await readJson(request), env);
       getSettings(env);
-      release = acquire(username);
+      release = acquire();
       return jsonResponse(200, await runModel(input, env, dependencies));
     } catch (error) {
       const typed = error instanceof ApiError ? error : new ApiError(500, 'INTERNAL', 'The request could not be completed.');
@@ -319,7 +297,6 @@ function createRunHandler(dependencies = {}) {
 module.exports = {
   ApiError,
   MAX_BODY_BYTES,
-  authenticate,
   readJson,
   validateInput,
   buildModelRequest,

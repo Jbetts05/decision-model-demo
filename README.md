@@ -4,6 +4,9 @@ A tiny live comparison of Microsoft Decision One, GPT-6 Astra, GPT-6 Luna and
 GPT-6 Sol. Select an example, edit the text, and run all four models in parallel.
 Cards show the answer, deployment, request latency, and API-reported tokens.
 There are no costs, winners, rankings, or stored submissions.
+Each example shows its classification question and possible labels. A compact
+Details inspector on each result shows the actual context, schema, and model
+output. These are observable API inputs and outputs, not internal reasoning.
 
 ## Deployment
 
@@ -18,12 +21,12 @@ The API requires these encrypted Static Web Apps application settings:
 | --- | --- |
 | `FOUNDRY_ENDPOINT` | Existing Foundry resource endpoint |
 | `FOUNDRY_API_KEY` | Existing Foundry API key, never committed |
-| `ALLOWED_GITHUB_USERS` | Comma-separated GitHub usernames permitted to run models |
 
 Deployment names default to `Decision-1`, `gpt-6-astra`, `gpt-6-luna`, and
 `gpt-6-sol`. Model credentials stay server-side. The page and sample catalog are
-public; live inference requires GitHub sign-in and inclusion in the API allowlist.
-To share live access, add the person's GitHub username to the allowlist setting.
+public, including live inference. Share the site URL directly with colleagues;
+no sign-in, invitation, access code, or GitHub account is required.
+Existing Foundry usage charges still apply to public requests.
 
 For the approved Azure subscription and receipt benchmark resource, run
 `scripts\provision.ps1` after creating the private repository. It provisions only
@@ -41,9 +44,9 @@ APIs and prompt representations mean token counts need not match.
 Each request has a 40-second model timeout, below the managed API's 45-second
 limit. Errors appear only in the affected card. The demo uses existing billable
 Foundry deployments even though the interface does not display cost.
-The API also caps each signed-in user at four concurrent requests and 24 requests
-per minute per API instance. This lightweight in-memory guard is not a global
-quota across scaled-out instances.
+The API caps public usage at 16 concurrent requests and 96 requests per minute
+per API instance. This lightweight in-memory guard is shared across visitors,
+resets on restart, and is not a global quota across scaled-out instances.
 
 ## Tests
 
